@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="hr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ravnice — Kalkulator trapeznog lima</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2F2F2F">
+  <link rel="icon" sizes="512x512" href="icon-512.png">
+  <style>
+    :root{
+      --bg: #f6f9fb;
+      --card: #fff;
+      --muted: #51606a;
+      --accent: #1e3a8a;
+      --danger: #b23;
+    }
+    * { box-sizing: border-box; }
+    body{
+      margin:0;
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg, #f2f6fb 0%, #fbfdff 100%);
+      padding:24px;
+    }
+    .wrap{ max-width:1000px; margin:0 auto; }
+    .card{ background:var(--card); border-radius:12px; padding:18px; box-shadow:0 8px 26px rgba(20,30,50,0.08); }
+    h1{ margin:0 0 6px 0; font-size:20px; }
+    p.lead{ margin:0 0 14px 0; color:var(--muted); font-size:13px; }
+    .grid{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-bottom:14px; }
+    label{ font-size:13px; color:var(--muted); display:block; margin-bottom:6px; }
+    select, input[type="number"], input[type="text"]{ width:100%; padding:10px 12px; border-radius:8px; border:1px solid #e0e7ef; background:#fff; font-size:14px; }
+    .inline { display:flex; gap:10px; align-items:center; }
+    .checkbox { display:flex; gap:8px; align-items:center; }
+    .table-wrap{ overflow:auto; margin-top:8px; }
+    table{ width:100%; border-collapse:collapse; font-size:14px; }
+    th, td{ padding:8px 10px; text-align:left; border-bottom:1px solid #f1f4f7; }
+    th{ color:var(--muted); font-weight:600; font-size:13px; }
+    .controls { display:flex; gap:12px; margin-top:12px; align-items:center; flex-wrap:wrap; }
+    button { background: var(--accent); color:white; border:none; padding:10px 14px; border-radius:8px; cursor:pointer; font-weight:700; }
+    button.secondary{ background:#f5f7fb; color:#0b1320; border:1px solid #e9eef4; font-weight:600; }
+    .result-card{ margin-left:auto; background:#f7fbff; padding:10px 14px; border-radius:8px; min-width:220px; text-align:left; font-weight:700; }
+    .small{ font-size:12px; color:var(--muted); font-weight:500; }
+    .muted{ color:var(--muted); }
+    .danger{ color:var(--danger); font-weight:700; }
+
+    @media print {
+      body * { visibility: hidden; }
+      #printable, #printable * { visibility: visible; }
+      #printable { position: absolute; left: 0; top: 0; width: 100%; }
+    }
+
+    @media (max-width:900px){ .grid{ grid-template-columns: 1fr; } .result-card{ width:100%; margin-left:0; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" id="app">
+      <h1>Ravnice — Kalkulator trapeznog lima</h1>
+      <p class="lead">Širina je fiksna 1 m → površina (m²) = količina × (duljina u m). Odaberi materijal, tip i dodaj redove sa količinom i duljinom.</p>
+
+      <div class="grid">
+        <div>
+          <label for="color">Boja (ne utječe na cijenu)</label>
+          <select id="color" aria-label="Boja">
+            <option value="">-- odaberi boju --</option>
+            <option>Bijela</option>
+            <option>Crvena</option>
+            <option>Plava</option>
+            <option>Zelena</option>
+            <option>Crna</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="material">Materijal (€/m²)</label>
+          <select id="material" aria-label="Materijal">
+            <option value="0">-- odaberi materijal --</option>
+            <option value="8">Pocinčani — 8.00 €/m²</option>
+            <option value="12">Aluminij — 12.00 €/m²</option>
+            <option value="10">Nehrđajući (INOX) — 10.00 €/m²</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="type">Tip (informativno)</label>
+          <select id="type" aria-label="Tip">
+            <option value="">-- odaberi tip --</option>
+            <option value="T20">T20</option>
+            <option value="T35">T35</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="inline" style="justify-content:space-between; gap:14px;">
+        <div class="checkbox">
+          <input type="checkbox" id="plast" />
+          <label for="plast">Plastificirani (dodaj fiksno €/m²)</label>
+          <input type="number" id="plast_price" value="2" min="0" step="0.01" style="width:96px; margin-left:6px;" title="Dodaj po m²" />
+        </div>
+        <div style="margin-left:auto" class="small muted"><div>Širina: <strong>1.00 m</strong></div></div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:12px;">
+        <table id="itemsTable" aria-label="Redovi artikala">
+          <thead>
+            <tr>
+              <th style="width:8%">#</th>
+              <th style="width:18%">Količina</th>
+              <th style="width:28%">Duljina (mm)</th>
+              <th style="width:20%">Površina (m²)</th>
+              <th style="width:18%">Cijena reda (€)</th>
+              <th style="width:8%"></th>
+            </tr>
+          </thead>
+          <tbody id="itemsBody"></tbody>
+        </table>
+      </div>
+
+      <div class="controls">
+        <button id="addRowBtn">+ Dodaj red</button>
+        <button class="secondary" id="clearRowsBtn">Očisti sve redove</button>
+        <div class="result-card" id="summary">
+          <div class="small">Ukupno M²:</div>
+          <div id="totalArea" style="font-size:18px; margin-top:6px;">0.00 m²</div>
+          <div class="small" style="margin-top:8px;">Ukupno (€):</div>
+          <div id="totalPrice" style="font-size:18px; margin-top:6px;">0.00 €</div>
+          <div class="small muted" style="margin-top:8px;">Tip: <span id="summaryType">-</span></div>
+        </div>
+        <button id="printBtn" style="margin-left:8px;">Ispiši ponudu</button>
+      </div>
+
+      <p class="small muted" style="margin-top:12px;">Napomena: duljinu upiši u milimetrima (mm), širina se računa fiksno 1 m. Plastificirani dodaje vrijednost po m².</p>
+    </div>
+
+    <div id="printable" style="display:none; margin-top:18px;"></div>
+  </div>
+
+  <script>
+  (function(){
+    const itemsBody = document.getElementById('itemsBody');
+    const addRowBtn = document.getElementById('addRowBtn');
+    const clearRowsBtn = document.getElementById('clearRowsBtn');
+    const totalAreaEl = document.getElementById('totalArea');
+    const totalPriceEl = document.getElementById('totalPrice');
+    const materialEl = document.getElementById('material');
+    const plastCheckbox = document.getElementById('plast');
+    const plastPriceEl = document.getElementById('plast_price');
+    const colorEl = document.getElementById('color');
+    const typeEl = document.getElementById('type');
+    const summaryType = document.getElementById('summaryType');
+    const printBtn = document.getElementById('printBtn');
+    const printable = document.getElementById('printable');
+    let rowIdCounter = 0;
+
+    function addRow(qty = 1, length_mm = 1200) {
+      rowIdCounter++;
+      const id = rowIdCounter;
+      const tr = document.createElement('tr');
+      tr.dataset.rowId = id;
+      tr.innerHTML = `
+        <td>${id}</td>
+        <td><input type="number" min="0" step="1" value="${qty}" class="qty" style="width:100%;"></td>
+        <td><input type="number" min="0" step="1" value="${length_mm}" class="len" style="width:100%;"></td>
+        <td class="area">0.00</td>
+        <td class="rowPrice">0.00</td>
+        <td style="text-align:center"><button class="removeBtn" title="Ukloni" style="background:#fff;border:1px solid #eee;padding:6px 8px;border-radius:6px;cursor:pointer">✕</button></td>
+      `;
+      tr.querySelector('.qty').addEventListener('input', calculate);
+      tr.querySelector('.len').addEventListener('input', calculate);
+      tr.querySelector('.removeBtn').addEventListener('click', () => { tr.remove(); calculate(); });
+      itemsBody.appendChild(tr);
+      calculate();
+    }
+
+    function calculate() {
+      const materialPrice = parseFloat(materialEl.value) || 0;
+      const plastChecked = plastCheckbox.checked;
+      const plastAdd = parseFloat(plastPriceEl.value) || 0;
+      const pricePerM2 = materialPrice + (plastChecked ? plastAdd : 0);
+      let totalArea = 0;
+      let totalPrice = 0;
+      const rows = Array.from(itemsBody.querySelectorAll('tr'));
+      rows.forEach((tr) => {
+        const qtyInput = tr.querySelector('.qty');
+        let qty = parseInt(qtyInput.value, 10);
+        if (isNaN(qty) || qty < 0) { qty = 0; qtyInput.value = 0; }
+        const lenInput = tr.querySelector('.len');
+        let len_mm = parseFloat(lenInput.value);
+        if (isNaN(len_mm) || len_mm < 0) { len_mm = 0; lenInput.value = 0; }
+        const len_m = len_mm / 1000.0;
+        const area = qty * len_m;
+        const rowPrice = area * pricePerM2;
+        tr.querySelector('.area').textContent = area.toFixed(3) + ' m²';
+        tr.querySelector('.rowPrice').textContent = rowPrice.toFixed(2) + ' €';
+        totalArea += area;
+        totalPrice += rowPrice;
+      });
+      totalAreaEl.textContent = totalArea.toFixed(3) + ' m²';
+      totalPriceEl.textContent = totalPrice.toFixed(2) + ' €';
+      summaryType.textContent = typeEl.value || '-';
+    }
+
+    addRowBtn.addEventListener('click', () => addRow(1, 1200));
+    clearRowsBtn.addEventListener('click', () => { itemsBody.innerHTML = ''; calculate(); });
+    materialEl.addEventListener('change', calculate);
+    plastCheckbox.addEventListener('change', calculate);
+    plastPriceEl.addEventListener('input', calculate);
+    colorEl.addEventListener('change', () => {});
+    typeEl.addEventListener('change', calculate);
+
+    printBtn.addEventListener('click', () => {
+      const rows = Array.from(itemsBody.querySelectorAll('tr'));
+      const materialText = materialEl.options[materialEl.selectedIndex]?.text || '-';
+      const colorText = colorEl.value || '-';
+      const typeText = typeEl.value || '-';
+      const plastChecked = plastCheckbox.checked;
+      const plastAdd = parseFloat(plastPriceEl.value) || 0;
+      let totalArea = 0;
+      let totalPrice = 0;
+      const itemsHtml = rows.map((tr, idx) => {
+        const qty = parseInt(tr.querySelector('.qty').value,10) || 0;
+        const len_mm = parseFloat(tr.querySelector('.len').value) || 0;
+        const len_m = (len_mm / 1000.0);
+        const area = qty * len_m;
+        const materialPrice = parseFloat(materialEl.value) || 0;
+        const pricePerM2 = materialPrice + (plastChecked ? plastAdd : 0);
+        const rowPrice = area * pricePerM2;
+        totalArea += area;
+        totalPrice += rowPrice;
+        return `<tr>
+          <td style="padding:6px 8px;border:1px solid #ddd">${idx+1}</td>
+          <td style="padding:6px 8px;border:1px solid #ddd">${qty}</td>
+          <td style="padding:6px 8px;border:1px solid #ddd">${len_mm} mm (${len_m.toFixed(3)} m)</td>
+          <td style="padding:6px 8px;border:1px solid #ddd">${area.toFixed(3)} m²</td>
+          <td style="padding:6px 8px;border:1px solid #ddd">${rowPrice.toFixed(2)} €</td>
+        </tr>`;
+      }).join('');
+      const html = `
+        <div style="font-family:Arial,Helvetica,sans-serif; padding:18px;">
+          <h2 style="margin:0 0 6px 0;">Ponuda — trapezni lim</h2>
+          <p style="margin:0 0 12px 0;">Boja: <strong>${escapeHtml(colorText)}</strong> &nbsp; | &nbsp; Materijal: <strong>${escapeHtml(materialText)}</strong> &nbsp; | &nbsp; Tip: <strong>${escapeHtml(typeText)}</strong></p>
+          <p style="margin:0 0 6px 0;">Plastificirani: <strong>${plastChecked ? 'Da (+' + plastAdd.toFixed(2) + ' €/m²)' : 'Ne'}</strong></p>
+          <table style="width:100%; border-collapse:collapse; margin-top:12px;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:6px 8px; border:1px solid #ddd">#</th>
+                <th style="text-align:left; padding:6px 8px; border:1px solid #ddd">Količina</th>
+                <th style="text-align:left; padding:6px 8px; border:1px solid #ddd">Duljina</th>
+                <th style="text-align:left; padding:6px 8px; border:1px solid #ddd">Površina</th>
+                <th style="text-align:left; padding:6px 8px; border:1px solid #ddd">Cijena</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml || '<tr><td colspan="5" style="padding:8px;border:1px solid #ddd'>Nema redova</td></tr>'}
+            </tbody>
+          </table>
+          <div style="margin-top:12px; font-weight:700;">
+            Ukupno površina: ${totalArea.toFixed(3)} m²<br>
+            Ukupno cijena: ${totalPrice.toFixed(2)} €
+          </div>
+          <div style="margin-top:20px; font-size:12px; color:#666;">
+            Napomena: širina je fiksna 1.00 m. Cijene su informativne — potvrdi cijenu prije finalne izrade.
+          </div>
+        </div>
+      `;
+      printable.style.display = 'block';
+      printable.innerHTML = html;
+      setTimeout(() => { window.print(); }, 150);
+    });
+
+    function escapeHtml(s){ if(!s) return ''; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;'); }
+
+    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('service-worker.js').then(function(){ console.log('SW registered'); }).catch(()=>{}); }
+
+    addRow(1,1200);
+  })();
+  </script>
+</body>
+</html>
